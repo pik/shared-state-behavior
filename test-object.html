@@ -1,0 +1,73 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="./shared-state-behavior.html">
+<!--
+`shared-state-behavior`
+Shared Service State for Elements
+
+@demo demo/index.html
+-->
+
+<dom-module id="test-object">
+  <template>
+    <style>
+      :host {
+        display: block;
+        margin-top: 0.4em;
+        border: 0.1em solid black;
+        border-radius: 1em;
+      }
+      .name-body {
+        font-size: 1.2em;
+      }
+      .body {
+        margin: 0.4em;
+      }
+    </style>
+    <div class="body">
+      <div class="name-body">[[name]]</div>
+      <div>
+        Shared State String: [[prop1]]
+      </div>
+      <div> Shared State Array:
+        <template is="dom-repeat" items="[[prop2]]" as="item">
+          [[item]]
+        </template>
+      </div>
+      <div>
+        Shared State Object
+        </br>
+        Foo: [[prop3.foo]]
+        </br>
+        Bar: [[prop3.bar]]
+      </div>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+
+      is: 'test-object',
+      behaviors: [
+        SharedStateBehavior
+      ],
+      properties: {
+        prop1: {
+          type: String,
+          value: '',
+          sharedValue: true,
+        },
+        prop2: {
+          type: Array,
+          value() { return [] },
+          sharedValue: true,
+        },
+        prop3: {
+          type: Object,
+          value() { return {} },
+          sharedValue: true,
+        }
+      },
+
+    });
+  </script>
+</dom-module>

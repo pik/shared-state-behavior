@@ -1,0 +1,112 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<!--
+`shared-state-behavior`
+Shared Service State for Elements
+
+@demo demo/index.html
+-->
+
+<script>
+(function() {
+'use strict';
+  const __registeredObservers = {}
+  const __instances = {}
+  const __sharedValues = {}
+  let __sharedChangedCounter = 0
+  let __notifyChangeCounter = 0
+  window.SharedStateBehavior = {
+
+    _sharedValueChanged(changes) {
+      __sharedChangedCounter += 1
+      console.log('__sharedChangedCounter', __sharedChangedCounter, this, changes.path, changes.base)
+      const _constructor = changes.base ? changes.base.constructor : undefined
+      if (_constructor === String || _constructor === Number || _constructor === undefined) {
+        if (changes.value === __sharedValues[changes.path]) return
+        __sharedValues[changes.path] = changes.value
+        for (let instance of __instances[changes.path]) {
+          if (instance !== this) {
+            instance.set(changes.path, changes.value)
+          }
+        }
+      } else if (_constructor === Array) {
+        const propertyPath = changes.path.split('.')[0]
+        const splicePath = changes.path.indexOf('splice') === -1 ? null : changes.path
+        // .* observers will be triggered twice per change for an array on .length and .splices
+        // so return early if we don't have a splicePath
+        if (!splicePath) {
+          return
+        }
+        const indexSplice = changes.value.indexSplices ? changes.value.indexSplices[0] : null
+        if (__sharedValues[splicePath] && indexSplice && (indexSplice === __sharedValues[splicePath])) {
+          return
+        }
+        // It's not the current-value (because it's the same array and dupping is expensive) but rather
+        // the indexSplice, if the indexSplice is the same the change has already propogated and is only
+        // notifying
+        __sharedValues[splicePath] = indexSplice
+        for (let instance of __instances[propertyPath]) {
+          if (instance !== this) {
+            console.log(instance, propertyPath, changes.base)
+            instance[propertyPath] = changes.base
+            __notifyChangeCounter += 1
+            console.log('__notifyChangeCounter', __notifyChangeCounter)
+            instance.notifySplices(propertyPath, changes.value.indexSplices)
+          }
+        }
+      } else if (_constructor === Object) {
+        const path = changes.path
+        const propertyPath = path.split('.')[0]
+        if (changes.value === __sharedValues[path]) return
+        __sharedValues[path] = changes.value
+        for (let instance of __instances[propertyPath]) {
+          if (instance !== this) {
+            instance.set(path, changes.value)
+          }
+        }
+      }
+    },
+
+    attached() {
+      const properties = this.properties
+      for (let property in properties) {
+        const propertyObj = properties[property]
+        if (propertyObj.sharedValue) {
+          // Register instance for notifications
+          if (!__instances[property]) __instances[property] = new Set()
+          __instances[property].add(this)
+          // Observers are shared between instances of the same element
+          // So keep track of elements for which we have already registered
+          // an observer
+          if (!__registeredObservers[this.constructor]) {
+            __registeredObservers[this.constructor] = new Set()
+          }
+          if (!__registeredObservers[this.constructor].has(property)) {
+            __registeredObservers[this.constructor].add(property)
+            // We use .* observers so that we can know changes.path and use a generic
+            // _sharedValueChanged function, rather than binding a custom one for
+            // each property
+            const observerEffect = '_sharedValueChanged(' + property +  '.*)'
+            console.log('_addComplexObserverEffect', this, observerEffect)
+            this._addComplexObserverEffect(observerEffect)
+          }
+        }
+      }
+    },
+
+    dettached() {
+      const properties = this.properties
+      for (let property in properties) {
+        if (properties[property].sharedValue) {
+          // Unregister instances from notifications
+          if (__instances[property]) __instances[property].delete(this)
+        }
+      }
+    },
+    getSharedValue(path) {
+      return __sharedValues[path]
+    }
+  }
+
+})()
+</script>
